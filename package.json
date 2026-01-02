@@ -1,0 +1,53 @@
+{
+  "name": "qa-checks-post-migration",
+  "version": "1.0.0",
+  "description": "Playwright test suite for WordPress migration validation - 26 legacy sites to unified subdirectory structure",
+  "scripts": {
+    "test": "playwright test",
+    "test:site": "playwright test --grep",
+    "test:availability": "playwright test tests/subdirectory-availability.spec.ts",
+    "test:assets": "playwright test tests/broken-assets.spec.ts",
+    "test:console": "playwright test tests/console-errors.spec.ts",
+    "test:links": "playwright test tests/internal-links.spec.ts",
+    "test:seo": "playwright test tests/seo-checks.spec.ts",
+    "test:sitemap": "playwright test tests/sitemap-comparison.spec.ts",
+    "test:redirects": "playwright test tests/redirect-parity.spec.ts",
+    "test:single-site": "SITE_FILTER=$npm_config_site playwright test",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug",
+    "report": "playwright show-report reports/html",
+    "allure:generate": "allure generate reports/allure-results --clean -o reports/allure-report",
+    "allure:generate-singleHTML": "allure generate reports/allure-results --single-file --clean -o reports/allure-report",
+    "allure:open": "allure open reports/allure-report",
+    "allure:serve": "allure serve reports/allure-results",
+    "allure:clean": "rm -rf reports/allure-results reports/allure-report",
+    "lint": "eslint src tests --ext .ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "playwright",
+    "testing",
+    "wordpress",
+    "migration",
+    "qa",
+    "automation"
+  ],
+  "author": "QA Team",
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "@playwright/test": "^1.40.0",
+    "@types/node": "^20.10.0",
+    "@typescript-eslint/eslint-plugin": "^6.13.0",
+    "@typescript-eslint/parser": "^6.13.0",
+    "allure-commandline": "^2.36.0",
+    "allure-playwright": "^3.4.3",
+    "eslint": "^8.55.0",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "fast-xml-parser": "^4.3.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
