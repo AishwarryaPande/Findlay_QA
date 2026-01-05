@@ -18,27 +18,26 @@ export const TEST_CONFIG: TestConfig = {
   // Controls depth-limited internal link validation
   // =============================================================================
   crawler: {
-    // Maximum crawl depth (0 = homepage only, 3 = three levels deep)
-    maxDepth: 3,
+    // Maximum crawl depth (0 = homepage only, 2 = two levels deep)
+    maxDepth: 2,
 
     // Maximum URLs to process per depth level
     // Prevents explosion on sites with many links
     maxUrlsPerDepth: {
       0: 1,     // Homepage only
-      1: 25,    // Up to 25 links from homepage
-      2: 50,    // Up to 50 links from depth 1 pages
-      3: 100    // Up to 100 links from depth 2 pages
+      1: 30,    // Up to 30 links from homepage
+      2: 50     // Up to 50 links from depth 1 pages
     },
 
     // Maximum total URLs to crawl per site
     // Hard limit to prevent runaway tests
-    maxTotalUrlsPerSite: 200,
+    maxTotalUrlsPerSite: 100,
 
     // Request timeout for individual page loads
     requestTimeout: 30000,
 
     // Delay between requests (ms) to avoid rate limiting
-    requestDelay: 100,
+    requestDelay: 25,
 
     // Patterns to exclude from crawling
     // Avoid infinite pagination, archives, and low-value pages

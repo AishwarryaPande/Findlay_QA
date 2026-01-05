@@ -25,6 +25,12 @@ export interface SiteMapping {
   /** Path to sitemap relative to domain root (defaults to /sitemap.xml) */
   sitemapPath?: string;
 
+  /** Path to OLD site sitemap (overrides sitemapPath for old site, useful when old/new use different sitemap plugins) */
+  oldSitemapPath?: string;
+
+  /** Path to NEW site sitemap (overrides sitemapPath for new site, useful when old/new use different sitemap plugins) */
+  newSitemapPath?: string;
+
   /** Whether this site is included in test runs */
   enabled: boolean;
 

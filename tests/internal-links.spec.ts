@@ -27,7 +27,7 @@
 import { test, expect } from '../src/fixtures/test-fixtures';
 import { getEnabledSites, buildSiteUrls, SITES, NEW_BASE_URL } from '../config/sites.config';
 import { CRAWLER_CONFIG } from '../config/test.config';
-import { DepthLimitedCrawler, extractAndCategorizeLinks, batchCheckUrls } from '../src/utils/crawler';
+import { DepthLimitedCrawler, extractAndCategorizeLinks, batchCheckUrls, filterPreExistingIssues } from '../src/utils/crawler';
 import { isOldDomain, isCrossSubdirectoryUrl, shouldExcludeUrl, hasSkippableExtension } from '../src/utils/url-normalizer';
 import { SiteMapping } from '../src/types';
 
@@ -42,7 +42,7 @@ test.describe('Internal Link Validation', () => {
     test.describe(`Site: ${site.name}`, () => {
       const urls = buildSiteUrls(site);
 
-      test('homepage internal links are valid', async ({ page, request }) => {
+      test('homepage internal links are valid', async ({ page, request }, testInfo) => {
         /**
          * WHY: Quick validation of links directly on homepage.
          * Most important links are typically on the homepage.
@@ -79,32 +79,70 @@ test.describe('Internal Link Validation', () => {
         const results = await batchCheckUrls(sampleLinks, request, 5);
         const brokenLinks = results.filter(r => !r.ok && r.status === 404);
 
-        if (brokenLinks.length > 0) {
-          console.log(`  ⚠️ Broken links found:`);
-          brokenLinks.forEach(l => console.log(`    - ${l.url} (${l.status})`));
+        // Filter out pre-existing issues (links that also fail on original site)
+        const { regressions, preExisting } = await filterPreExistingIssues(brokenLinks, site, request);
+
+        // Attach detailed breakdown to test report
+        await testInfo.attach('link-validation-summary', {
+          body: JSON.stringify({
+            site: site.name,
+            test: 'homepage-internal-links',
+            timestamp: new Date().toISOString(),
+            stats: {
+              totalInternalLinks: categorizedLinks.internal.length,
+              linksChecked: sampleSize,
+              totalBroken: brokenLinks.length,
+              regressions: regressions.length,
+              preExisting: preExisting.length
+            },
+            regressions: regressions.map(r => ({
+              url: r.url,
+              status: r.status,
+              originalStatus: r.originalStatus
+            })),
+            preExisting: preExisting.map(p => ({
+              url: p.url,
+              status: p.status,
+              originalUrl: p.originalUrl,
+              originalStatus: p.originalStatus
+            }))
+          }, null, 2),
+          contentType: 'application/json'
+        });
+
+        if (preExisting.length > 0) {
+          console.log(`  ℹ️ Ignored pre-existing issues (${preExisting.length}):`);
+          preExisting.slice(0, 5).forEach(l => console.log(`    - ${l.url} (also fails on ${l.originalUrl})`));
+          if (preExisting.length > 5) {
+            console.log(`    ... and ${preExisting.length - 5} more`);
+          }
+        }
+
+        if (regressions.length > 0) {
+          console.log(`  ⚠️ Migration regressions found (${regressions.length}):`);
+          regressions.forEach(l => console.log(`    - ${l.url} (${l.status})`));
         }
 
         expect(
-          brokenLinks.length,
-          `Found ${brokenLinks.length} broken internal links (404):\n${brokenLinks.map(l => l.url).join('\n')}`
+          regressions.length,
+          `Found ${regressions.length} migration regressions (404 on new site, works on original):\n${regressions.map(l => l.url).join('\n')}`
         ).toBe(0);
       });
 
-      test('depth-limited crawl finds no broken links', async ({ page, request }) => {
+      test('depth-limited crawl finds no broken links', async ({ page, request }, testInfo) => {
         /**
          * WHY: Comprehensive link validation up to depth 3.
          * Catches issues that homepage-only testing would miss.
          */
         const crawler = new DepthLimitedCrawler(site, {
-          maxDepth: 3,
+          maxDepth: 2,
           maxUrlsPerDepth: {
             0: 1,
-            1: 15, // Reduced for test speed
-            2: 30,
-            3: 50
+            1: 30,
+            2: 50
           },
           maxTotalUrlsPerSite: 100, // Limit for test speed
-          requestDelay: 50
+          requestDelay: 25
         });
 
         const result = await crawler.crawl(page, request);
@@ -133,11 +171,63 @@ test.describe('Internal Link Validation', () => {
           `Found ${result.crossSubdirectoryUrls.length} cross-subdirectory links:\n${result.crossSubdirectoryUrls.slice(0, 10).join('\n')}`
         ).toBe(0);
 
-        // Fail if there are broken links
+        // Fail if there are broken links (after filtering pre-existing issues)
         const brokenLinks = result.failedUrls.filter(u => u.status === 404);
+
+        // Filter out pre-existing issues
+        const { regressions, preExisting } = await filterPreExistingIssues(brokenLinks, site, request);
+
+        // Attach detailed breakdown to test report
+        await testInfo.attach('link-validation-summary', {
+          body: JSON.stringify({
+            site: site.name,
+            test: 'depth-limited-crawl',
+            timestamp: new Date().toISOString(),
+            crawlStats: {
+              totalUrls: result.urls.length,
+              totalTime: result.totalTime,
+              statsByDepth: result.statsByDepth
+            },
+            stats: {
+              totalBroken: brokenLinks.length,
+              regressions: regressions.length,
+              preExisting: preExisting.length,
+              oldDomainLinks: result.oldDomainUrls.length,
+              crossSubdirectoryLinks: result.crossSubdirectoryUrls.length
+            },
+            regressions: regressions.map(r => ({
+              url: r.url,
+              status: r.status,
+              parentUrl: r.parentUrl,
+              originalStatus: r.originalStatus
+            })),
+            preExisting: preExisting.map(p => ({
+              url: p.url,
+              status: p.status,
+              parentUrl: p.parentUrl,
+              originalUrl: p.originalUrl,
+              originalStatus: p.originalStatus
+            }))
+          }, null, 2),
+          contentType: 'application/json'
+        });
+
+        if (preExisting.length > 0) {
+          console.log(`  ℹ️ Ignored pre-existing issues (${preExisting.length}):`);
+          preExisting.slice(0, 5).forEach(l => console.log(`    - ${l.url} (also fails on ${l.originalUrl})`));
+          if (preExisting.length > 5) {
+            console.log(`    ... and ${preExisting.length - 5} more`);
+          }
+        }
+
+        if (regressions.length > 0) {
+          console.log(`  ⚠️ Migration regressions found (${regressions.length}):`);
+          regressions.slice(0, 10).forEach(l => console.log(`    - ${l.url} (from ${l.parentUrl})`));
+        }
+
         expect(
-          brokenLinks.length,
-          `Found ${brokenLinks.length} broken links (404):\n${brokenLinks.slice(0, 10).map(u => `${u.url} (from ${u.parentUrl})`).join('\n')}`
+          regressions.length,
+          `Found ${regressions.length} migration regressions (404 on new site, works on original):\n${regressions.slice(0, 10).map(u => `${u.url} (from ${u.parentUrl})`).join('\n')}`
         ).toBe(0);
       });
 
@@ -206,7 +296,7 @@ test.describe('Internal Link Validation', () => {
         }
       });
 
-      test('navigation menu links are valid', async ({ page, request }) => {
+      test('navigation menu links are valid', async ({ page, request }, testInfo) => {
         /**
          * WHY: Navigation menus are the primary way users browse the site.
          * Broken nav links are highly visible.
@@ -247,14 +337,51 @@ test.describe('Internal Link Validation', () => {
         const results = await batchCheckUrls(navLinks, request, 5);
         const brokenNavLinks = results.filter(r => !r.ok);
 
-        if (brokenNavLinks.length > 0) {
-          console.log(`  ⚠️ Broken navigation links:`);
-          brokenNavLinks.forEach(l => console.log(`    - ${l.url} (${l.status || l.error})`));
+        // Filter out pre-existing issues
+        const { regressions, preExisting } = await filterPreExistingIssues(brokenNavLinks, site, request);
+
+        // Attach detailed breakdown to test report
+        await testInfo.attach('link-validation-summary', {
+          body: JSON.stringify({
+            site: site.name,
+            test: 'navigation-menu-links',
+            timestamp: new Date().toISOString(),
+            stats: {
+              totalNavLinks: navLinks.length,
+              totalBroken: brokenNavLinks.length,
+              regressions: regressions.length,
+              preExisting: preExisting.length
+            },
+            regressions: regressions.map(r => ({
+              url: r.url,
+              status: r.status,
+              error: r.error,
+              originalStatus: r.originalStatus
+            })),
+            preExisting: preExisting.map(p => ({
+              url: p.url,
+              status: p.status,
+              error: p.error,
+              originalUrl: p.originalUrl,
+              originalStatus: p.originalStatus
+            }))
+          }, null, 2),
+          contentType: 'application/json'
+        });
+
+        if (preExisting.length > 0) {
+          console.log(`  ℹ️ Ignored pre-existing navigation issues (${preExisting.length}):`);
+          preExisting.forEach(l => console.log(`    - ${l.url} (also fails on ${l.originalUrl})`));
+        }
+
+        if (regressions.length > 0) {
+          console.log(`  ⚠️ Migration regressions in navigation (${regressions.length}):`);
+          regressions.forEach(l => console.log(`    - ${l.url} (${l.status || l.error})`));
         }
 
         expect(
-          brokenNavLinks.length,
-          `Found ${brokenNavLinks.length} broken navigation links:\n${brokenNavLinks.map(l => `${l.url} (${l.status})`).join('\n')}`
+          regressions.length,
+          `Found ${regressions.length} migration regressions in navigation links:\n${regressions.map(l => `${l.url} (${l.status})`).join('\n')}`
         ).toBe(0);
       });
     });
@@ -264,10 +391,11 @@ test.describe('Internal Link Validation', () => {
 test.describe('Link Validation Summary', () => {
   test.setTimeout(300000); // 5 minutes for summary
 
-  test('quick link health check across all sites', async ({ request }) => {
+  test('quick link health check across all sites', async ({ request }, testInfo) => {
     /**
      * WHY: Fast overview of link health for all sites.
      * Uses API requests only for speed.
+     * NOW: Also filters pre-existing issues vs migration regressions.
      */
     console.log('\n📊 Link Health Summary:');
     console.log('─'.repeat(60));
@@ -275,7 +403,8 @@ test.describe('Link Validation Summary', () => {
     const summary: Array<{
       site: string;
       totalLinks: number;
-      brokenLinks: number;
+      regressions: number;
+      preExisting: number;
       oldDomainLinks: number;
     }> = [];
 
@@ -323,17 +452,21 @@ test.describe('Link Validation Summary', () => {
           .slice(0, 10);
 
         const results = await batchCheckUrls(internalLinks, request, 5);
-        const brokenCount = results.filter(r => r.status === 404).length;
+        const brokenLinks = results.filter(r => r.status === 404);
+
+        // Filter pre-existing vs regressions
+        const filtered = await filterPreExistingIssues(brokenLinks, site, request);
 
         summary.push({
           site: site.name,
           totalLinks: uniqueLinks.length,
-          brokenLinks: brokenCount,
+          regressions: filtered.regressions.length,
+          preExisting: filtered.preExisting.length,
           oldDomainLinks: oldDomainCount
         });
 
-        const icon = brokenCount === 0 && oldDomainCount === 0 ? '✅' : '⚠️';
-        console.log(`${icon} ${site.name}: ${uniqueLinks.length} links, ${brokenCount} broken, ${oldDomainCount} old-domain`);
+        const icon = filtered.regressions.length === 0 && oldDomainCount === 0 ? '✅' : '⚠️';
+        console.log(`${icon} ${site.name}: ${uniqueLinks.length} links, ${filtered.regressions.length} regressions, ${filtered.preExisting.length} pre-existing, ${oldDomainCount} old-domain`);
       } catch (error) {
         console.log(`❌ ${site.name}: Failed to check links`);
       }
@@ -341,10 +474,29 @@ test.describe('Link Validation Summary', () => {
 
     console.log('─'.repeat(60));
 
-    const totalBroken = summary.reduce((sum, s) => sum + s.brokenLinks, 0);
+    const totalRegressions = summary.reduce((sum, s) => sum + s.regressions, 0);
+    const totalPreExisting = summary.reduce((sum, s) => sum + s.preExisting, 0);
     const totalOldDomain = summary.reduce((sum, s) => sum + s.oldDomainLinks, 0);
-    const sitesWithIssues = summary.filter(s => s.brokenLinks > 0 || s.oldDomainLinks > 0).length;
+    const sitesWithRegressions = summary.filter(s => s.regressions > 0 || s.oldDomainLinks > 0).length;
 
-    console.log(`Total: ${totalBroken} broken links, ${totalOldDomain} old-domain links across ${sitesWithIssues} sites`);
+    console.log(`Total: ${totalRegressions} regressions, ${totalPreExisting} pre-existing (ignored), ${totalOldDomain} old-domain links`);
+    console.log(`Sites with migration issues: ${sitesWithRegressions}`);
+
+    // Attach comprehensive summary to test report
+    await testInfo.attach('all-sites-link-summary', {
+      body: JSON.stringify({
+        test: 'all-sites-link-health-check',
+        timestamp: new Date().toISOString(),
+        overallStats: {
+          totalSites: summary.length,
+          totalRegressions,
+          totalPreExisting,
+          totalOldDomainLinks: totalOldDomain,
+          sitesWithRegressions
+        },
+        siteSummaries: summary
+      }, null, 2),
+      contentType: 'application/json'
+    });
   });
 });

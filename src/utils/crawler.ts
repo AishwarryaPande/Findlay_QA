@@ -33,7 +33,8 @@ import {
   hasSkippableExtension,
   resolveUrl,
   extractPath,
-  isOldDomain
+  isOldDomain,
+  convertToOldUrl
 } from './url-normalizer';
 
 /**
@@ -329,6 +330,79 @@ export async function batchCheckUrls(
   }
 
   return results;
+}
+
+/**
+ * Check broken links against original site to filter pre-existing issues
+ *
+ * MIGRATION CONTEXT:
+ * When a link fails on the migrated site, we need to check if it also fails
+ * on the original site. If yes, it's a pre-existing issue and should be ignored.
+ * We only care about regressions (links that work on original but fail on migrated).
+ *
+ * OPTIMIZATION: Batches original site checks in parallel for speed
+ */
+export async function filterPreExistingIssues(
+  brokenLinks: Array<{ url: string; status: number; ok: boolean; error?: string; parentUrl?: string }>,
+  site: SiteMapping,
+  request: APIRequestContext,
+  timeout = 10000
+): Promise<{
+  regressions: Array<{ url: string; status: number; ok: boolean; error?: string; parentUrl?: string; originalStatus?: number }>;
+  preExisting: Array<{ url: string; status: number; ok: boolean; error?: string; parentUrl?: string; originalUrl: string; originalStatus: number }>;
+}> {
+  const regressions: Array<{ url: string; status: number; ok: boolean; error?: string; parentUrl?: string; originalStatus?: number }> = [];
+  const preExisting: Array<{ url: string; status: number; ok: boolean; error?: string; parentUrl?: string; originalUrl: string; originalStatus: number }> = [];
+
+  // Convert all URLs to original site URLs
+  const urlPairs = brokenLinks.map(brokenLink => {
+    try {
+      const originalUrl = convertToOldUrl(brokenLink.url, site);
+      return { brokenLink, originalUrl };
+    } catch (error) {
+      return { brokenLink, originalUrl: null };
+    }
+  });
+
+  // Batch check all original URLs in parallel
+  const originalUrls = urlPairs.map(pair => pair.originalUrl).filter((url): url is string => url !== null);
+  const originalChecks = await batchCheckUrls(originalUrls, request, 10, timeout);
+
+  // Create a map of original URL to check result for fast lookup
+  const originalCheckMap = new Map(originalChecks.map(check => [check.url, check]));
+
+  // Categorize each broken link
+  for (const { brokenLink, originalUrl } of urlPairs) {
+    if (!originalUrl) {
+      // Couldn't convert URL, treat as regression to be safe
+      regressions.push(brokenLink);
+      continue;
+    }
+
+    const originalCheck = originalCheckMap.get(originalUrl);
+    if (!originalCheck) {
+      // Check failed, treat as regression to be safe
+      regressions.push(brokenLink);
+      continue;
+    }
+
+    if (!originalCheck.ok) {
+      // Original also fails - this is a pre-existing issue, ignore it
+      preExisting.push({
+        ...brokenLink,
+        originalUrl,
+        originalStatus: originalCheck.status
+      });
+    } else {
+      // Original works but migrated fails - this is a regression!
+      regressions.push({
+        ...brokenLink,
+        originalStatus: originalCheck.status
+      });
+    }
+  }
+
+  return { regressions, preExisting };
 }
 
 /**

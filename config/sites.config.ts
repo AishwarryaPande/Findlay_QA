@@ -33,7 +33,8 @@ export const SITES: SiteMapping[] = [
     name: 'bainbridgereview',
     oldDomain: 'https://www.bainbridgereview.com',
     subdirectoryPath: 'bainbridgereview',
-    sitemapPath: '/sitemap.xml',
+    oldSitemapPath: '/sitemap_index.xml',  // Old site uses Yoast/different plugin
+    newSitemapPath: '/sitemap.xml',         // New site uses Jetpack
     enabled: true,
     priority: 1
   },
@@ -275,10 +276,14 @@ export function getSitesByPriority(): SiteMapping[] {
  * Build full URLs for a site
  */
 export function buildSiteUrls(site: SiteMapping) {
+  // Support separate sitemap paths for old and new sites
+  const oldSitemapPath = site.oldSitemapPath || site.sitemapPath || '/sitemap.xml';
+  const newSitemapPath = site.newSitemapPath || site.sitemapPath || '/sitemap.xml';
+
   return {
     oldHomepage: site.oldDomain,
     newHomepage: `${NEW_BASE_URL}/${site.subdirectoryPath}/`,
-    oldSitemap: `${site.oldDomain}${site.sitemapPath || '/sitemap.xml'}`,
-    newSitemap: `${NEW_BASE_URL}/${site.subdirectoryPath}${site.sitemapPath || '/sitemap.xml'}`
+    oldSitemap: `${site.oldDomain}${oldSitemapPath}`,
+    newSitemap: `${NEW_BASE_URL}/${site.subdirectoryPath}${newSitemapPath}`
   };
 }

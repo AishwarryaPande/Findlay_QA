@@ -137,8 +137,13 @@ export async function compareSitemaps(
   site: SiteMapping,
   request: APIRequestContext
 ): Promise<SitemapComparisonResult> {
-  const oldSitemapUrl = `${site.oldDomain}${site.sitemapPath || '/sitemap.xml'}`;
-  const newSitemapUrl = `${NEW_BASE_URL}/${site.subdirectoryPath}${site.sitemapPath || '/sitemap.xml'}`;
+  // Support separate sitemap paths for old and new sites
+  // This handles cases where old site uses Yoast and new site uses Jetpack
+  const oldSitemapPath = site.oldSitemapPath || site.sitemapPath || '/sitemap.xml';
+  const newSitemapPath = site.newSitemapPath || site.sitemapPath || '/sitemap.xml';
+
+  const oldSitemapUrl = `${site.oldDomain}${oldSitemapPath}`;
+  const newSitemapUrl = `${NEW_BASE_URL}/${site.subdirectoryPath}${newSitemapPath}`;
 
   // Fetch both sitemaps
   const [oldResult, newResult] = await Promise.all([

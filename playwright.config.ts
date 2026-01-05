@@ -30,8 +30,8 @@ export default defineConfig({
 
   // Parallel workers:
   // - CI: Use 4 workers to balance speed and resource usage
-  // - Local: Use 50% of CPU cores
-  workers: process.env.CI ? 4 : undefined,
+  // - Local: Use 6 workers for faster execution
+  workers: process.env.CI ? 4 : 6,
 
   // Reporter configuration for stakeholder visibility
   reporter: [
