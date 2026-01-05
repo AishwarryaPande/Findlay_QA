@@ -172,7 +172,9 @@ test.describe('Internal Link Validation', () => {
         ).toBe(0);
 
         // Fail if there are broken links (after filtering pre-existing issues)
-        const brokenLinks = result.failedUrls.filter(u => u.status === 404);
+        const brokenLinks = result.failedUrls
+          .filter(u => u.status === 404)
+          .map(u => ({ ...u, ok: u.success, parentUrl: u.parentUrl ?? undefined }));
 
         // Filter out pre-existing issues
         const { regressions, preExisting } = await filterPreExistingIssues(brokenLinks, site, request);
