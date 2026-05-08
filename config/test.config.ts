@@ -24,20 +24,20 @@ export const TEST_CONFIG: TestConfig = {
     // Maximum URLs to process per depth level
     // Prevents explosion on sites with many links
     maxUrlsPerDepth: {
-      0: 1,     // Homepage only
-      1: 30,    // Up to 30 links from homepage
-      2: 50     // Up to 50 links from depth 1 pages
+      0: 1,
+      1: 100,
+      2: 250
     },
 
     // Maximum total URLs to crawl per site
     // Hard limit to prevent runaway tests
-    maxTotalUrlsPerSite: 100,
+    maxTotalUrlsPerSite: 400,
 
     // Request timeout for individual page loads
     requestTimeout: 30000,
 
     // Delay between requests (ms) to avoid rate limiting
-    requestDelay: 25,
+    requestDelay: 10,
 
     // Patterns to exclude from crawling
     // Avoid infinite pagination, archives, and low-value pages
@@ -140,34 +140,7 @@ export const TEST_CONFIG: TestConfig = {
 
     // Domains that should NEVER appear in asset URLs
     // These are the old domains being migrated FROM
-    forbiddenAssetDomains: [
-      'www.bainbridgereview.com',
-      'www.bellevuereporter.com',
-      'www.bothell-reporter.com',
-      'www.courierherald.com',
-      'www.federalwaymirror.com',
-      'www.forksforum.com',
-      'www.heraldnet.com',
-      'www.homernews.com',
-      'www.islandssounder.com',
-      'www.islandsweekly.com',
-      'www.juneauempire.com',
-      'www.kentreporter.com',
-      'www.kirklandreporter.com',
-      'www.kitsapdailynews.com',
-      'www.mi-reporter.com',
-      'www.peninsulaclarion.com',
-      'www.peninsuladailynews.com',
-      'www.redmond-reporter.com',
-      'www.sanjuanjournal.com',
-      'www.sequimgazette.com',
-      'www.southwhidbeyrecord.com',
-      'www.tacomadailyindex.com',
-      'www.thedailyworld.com',
-      'www.valleyrecord.com',
-      'www.vashonbeachcomber.com',
-      'www.whidbeynewstimes.com'
-    ]
+    forbiddenAssetDomains: []
   },
 
   // =============================================================================

@@ -67,7 +67,7 @@ export default defineConfig({
   // Shared settings for all projects
   use: {
     // Base URL for the new WordPress installation
-    baseURL: 'https://cmg-northwest2.go-vip.net',
+    baseURL: 'https://findlayedu.wpenginepowered.com',
 
     // Collect trace on first retry for debugging
     trace: 'on-first-retry',
