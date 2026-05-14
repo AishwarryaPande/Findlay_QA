@@ -1,40 +1,41 @@
-# WordPress Migration QA Test Suite
+# Playwright QA Suite — Findlay WordPress
 
-Production-ready Playwright test suite for validating the migration of 26 legacy WordPress sites into a unified subdirectory-based WordPress installation.
-
-## Overview
-
-This test suite validates the migration from individual WordPress domains to a consolidated installation at `https://cmg-northwest2.go-vip.net/` where each legacy site becomes a subdirectory.
-
-**Example Migration:**
-- Old: `https://www.bainbridgereview.com/news/article-123`
-- New: `https://cmg-northwest2.go-vip.net/bainbridgereview/news/article-123`
+Playwright + TypeScript project for:
+- responsiveness QA
+- cross-browser consistency checks
+- Core Web Vitals (CWV) measurement
 
 ## Quick Start
 
 ```bash
-# Install dependencies
 npm install
-
-# Install Playwright browsers
-npx playwright install chromium
-
-# Run all tests
+npx playwright install
 npm test
-
-# Run tests for a specific site
-npm run test:single-site --site=bainbridgereview
-
-# Run a specific test category
-npm run test:availability
-npm run test:assets
-npm run test:seo
-npm run test:sitemap
-npm run test:redirects
-
-# View HTML report
-npm run report
 ```
+
+## Focused runs
+
+```bash
+npm run test:responsive
+npm run test:browsers
+npm run test:cwv
+
+npm run test:chrome
+npm run test:firefox
+npm run test:safari
+npm run test:mobile
+npm run test:desktop
+```
+
+## Generated outputs
+
+- reports/qa-report.html
+- reports/qa-report.json
+- reports/cwv-report.json
+- reports/summary.json
+- reports/cwv-report.csv
+- screenshots/
+- test-results/
 
 ## Test Categories
 

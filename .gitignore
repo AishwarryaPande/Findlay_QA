@@ -11,9 +11,15 @@ reports/*.xml
 reports/test-artifacts/
 reports/allure-results/
 reports/allure-report/
+reports/qa-screenshots/
+reports/unlighthouse*/
 allure-results/
 allure-report/
 .allure/
+
+# Local QA runtime and visual artifacts
+.qa-runtime/
+screenshots/
 
 # Playwright
 playwright-report/

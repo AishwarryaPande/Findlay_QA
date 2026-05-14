@@ -8,9 +8,33 @@ const inputUrlsPath = path.join(projectRoot, 'content-audit-urls.txt');
 const inputInternalCsvPath = path.join(projectRoot, 'content-audit-results.csv');
 const inputExternalCsvPath = path.join(projectRoot, 'content-audit-external-links.csv');
 const reportsDir = path.join(projectRoot, 'reports');
-const outputPath = path.join(reportsDir, 'qa-content-verification-report.html');
-const outputSummaryCsvPath = path.join(reportsDir, 'qa-content-verification-summary.csv');
-const outputDetailsCsvPath = path.join(reportsDir, 'qa-content-verification-details.csv');
+const outputSuffixArg = (process.argv[2] || '').trim();
+const suffix = outputSuffixArg
+  ? `-${outputSuffixArg.replace(/[^0-9A-Za-z._-]/g, '-')}`
+  : '';
+const outputPath = path.join(reportsDir, `qa-content-verification-report${suffix}.html`);
+const outputSummaryCsvPath = path.join(reportsDir, `qa-content-verification-summary${suffix}.csv`);
+const outputDetailsCsvPath = path.join(reportsDir, `qa-content-verification-details${suffix}.csv`);
+
+function getRedirectHops(redirectChain) {
+  const statuses = String(redirectChain || '')
+    .split('→')
+    .map((v) => Number(v.trim()))
+    .filter((n) => Number.isFinite(n) && n > 0);
+
+  if (!statuses.length) return 0;
+
+  let hops = 0;
+  for (const code of statuses) {
+    if (code >= 300 && code < 400) {
+      hops += 1;
+    } else {
+      break;
+    }
+  }
+
+  return hops;
+}
 
 function escapeHtml(input) {
   return String(input ?? '')
@@ -125,30 +149,28 @@ const hardFailRows = internalRows.filter((r) => {
     || label.includes('INFINITE_REDIRECT_LOOP');
 });
 
-const warningRows = internalRows.filter((r) => {
-  const code = Number(r.FinalStatusCode || 0);
-  const label = String(r.StatusLabel || '');
-  return code === 429 || label.includes('TIMEOUT') || label.includes('UNKNOWN_ERROR') || label.includes('CONNECTION_REFUSED');
-});
-
 function verdictForRow(row) {
   const code = Number(row.FinalStatusCode || 0);
   const label = String(row.StatusLabel || '');
+  const redirectHops = getRedirectHops(row.RedirectChain);
+  const responseTimeMs = Number(row.ResponseTimeMs || 0);
 
   const isFail = row.HardFail === 'YES'
     || code === 404
     || (code >= 500 && code < 600)
-    || label.includes('INFINITE_REDIRECT_LOOP');
+    || label.includes('INFINITE_REDIRECT_LOOP')
+    || label.includes('TIMEOUT');
 
   if (isFail) return 'FAIL';
 
-  const isWarn = code === 429
-    || label.includes('TIMEOUT')
-    || label.includes('UNKNOWN_ERROR')
-    || label.includes('CONNECTION_REFUSED');
+  const isWarn = redirectHops > 2 || responseTimeMs > 3000;
 
   if (isWarn) return 'WARN';
-  return 'PASS';
+
+  const isPass = code === 200 || (redirectHops >= 1 && code === 200);
+  if (isPass) return 'PASS';
+
+  return 'WARN';
 }
 
 const detailedRows = internalRows.map((row) => ({
@@ -159,6 +181,7 @@ const detailedRows = internalRows.map((row) => ({
 const passRows = detailedRows.filter((r) => r.Verdict === 'PASS');
 const failRows = detailedRows.filter((r) => r.Verdict === 'FAIL');
 const warnRows = detailedRows.filter((r) => r.Verdict === 'WARN');
+const warningRows = warnRows;
 
 const totalEvaluated = detailedRows.length;
 const passRate = totalEvaluated ? ((passRows.length / totalEvaluated) * 100).toFixed(1) : '0.0';
@@ -237,7 +260,7 @@ const html = `<!doctype html>
           <tr><td><strong>Total evaluated internal link occurrences</strong></td><td><strong>${totalEvaluated}</strong></td><td><strong>100.0%</strong></td></tr>
         </tbody>
       </table>
-      <div class="note" style="margin-top:10px;">Full row-level pass/warn/fail data is exported in CSV: qa-content-verification-details.csv</div>
+      <div class="note" style="margin-top:10px;">Full row-level pass/warn/fail data is exported in CSV: ${escapeHtml(path.basename(outputDetailsCsvPath))}</div>
     </div>
 
     <div class="card">

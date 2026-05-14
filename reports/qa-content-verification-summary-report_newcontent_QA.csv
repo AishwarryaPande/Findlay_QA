@@ -1,0 +1,14 @@
+Metric,Value
+Developer CSV URL lines submitted,620
+Unique URLs in content scope,620
+Duplicate URL lines in content scope,0
+Source pages crawled,620
+Internal link occurrences checked,90355
+External link occurrences captured,28410
+PASS internal link occurrences,87149
+WARN internal link occurrences,2
+FAIL internal link occurrences,3204
+PASS rate (%),96.5
+WARN rate (%),0.0
+FAIL rate (%),3.5
+Report generated at,2026-05-12T10:06:57.928Z

@@ -7,6 +7,7 @@ const { chromium } = require('@playwright/test');
 const INPUT_FILE = path.resolve(process.cwd(), 'content-audit-urls.txt');
 const OUTPUT_FILE = path.resolve(process.cwd(), 'content-audit-results.csv');
 const EXTERNAL_OUTPUT_FILE = path.resolve(process.cwd(), 'content-audit-external-links.csv');
+const SKIPPED_OUTPUT_FILE = path.resolve(process.cwd(), 'content-audit-skipped-pages.csv');
 
 const REQUEST_DELAY_MS = 800;
 const NAV_TIMEOUT_MS = 30000;
@@ -154,7 +155,9 @@ async function main() {
   const allOccurrences = [];
   const internalToOccurrences = new Map();
   const externalRows = [];
+  const skippedPages = [];
   const checkedAt = new Date().toISOString();
+  let crawledPagesCount = 0;
 
   try {
     for (let i = 0; i < pageUrls.length; i += 1) {
@@ -246,8 +249,14 @@ async function main() {
           }
         }
 
+        crawledPagesCount += 1;
         console.log(`[${String(i + 1).padStart(3, '0')}/${pageUrls.length}] ✅ Crawled ${sourceUrl}`);
       } catch (error) {
+        skippedPages.push({
+          SourcePage: sourceUrl,
+          Error: error?.message || String(error),
+          CheckedAt: checkedAt
+        });
         console.log(`[${String(i + 1).padStart(3, '0')}/${pageUrls.length}] ⚠️ Could not crawl ${sourceUrl} (${error?.message || error})`);
       } finally {
         await page.close();
@@ -280,7 +289,8 @@ async function main() {
 
       const hardFail = status.finalStatusCode === 404
         || (status.finalStatusCode >= 500 && status.finalStatusCode < 600)
-        || status.statusLabel === 'INFINITE_REDIRECT_LOOP';
+        || status.statusLabel === 'INFINITE_REDIRECT_LOOP'
+        || status.statusLabel === 'TIMEOUT';
 
       for (const row of occurrences) {
         row.FinalStatusCode = status.finalStatusCode;
@@ -320,16 +330,21 @@ async function main() {
 
   fs.writeFileSync(OUTPUT_FILE, toCsv(allOccurrences, headers), 'utf8');
   fs.writeFileSync(EXTERNAL_OUTPUT_FILE, toCsv(externalRows, headers), 'utf8');
+  fs.writeFileSync(SKIPPED_OUTPUT_FILE, toCsv(skippedPages, ['SourcePage', 'Error', 'CheckedAt']), 'utf8');
 
   const hardFails = allOccurrences.filter((r) => r.HardFail === 'YES').length;
+  const skippedCount = skippedPages.length;
 
   console.log('\n─────────────────────────');
-  console.log(`📄 Pages crawled: ${pageUrls.length}`);
+  console.log(`📄 Pages requested: ${pageUrls.length}`);
+  console.log(`✅ Pages crawled successfully: ${crawledPagesCount}`);
+  console.log(`⚠️ Pages skipped: ${skippedCount}`);
   console.log(`🔗 Internal link occurrences checked: ${allOccurrences.length}`);
   console.log(`🌍 External link occurrences captured: ${externalRows.length}`);
   console.log(`🚨 Hard fail internal link occurrences: ${hardFails}`);
   console.log(`\nSaved: ${OUTPUT_FILE}`);
   console.log(`Saved: ${EXTERNAL_OUTPUT_FILE}`);
+  console.log(`Saved: ${SKIPPED_OUTPUT_FILE}`);
 }
 
 main().catch((error) => {
