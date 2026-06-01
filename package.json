@@ -14,7 +14,19 @@
     "test:desktop": "playwright test --project=chromium-desktop",
     "report": "open reports/qa-report.html",
     "clean": "rm -rf screenshots reports test-results .qa-runtime",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "check-404": "ts-node --project tsconfig.scripts.json scripts/check-404-playwright.ts",
+    "check-404:fast": "CONCURRENCY=20 ts-node --project tsconfig.scripts.json scripts/check-404-playwright.ts",
+    "check-links": "ts-node --project tsconfig.scripts.json scripts/check-internal-links.ts",
+    "check-links:fast": "CRAWL_CONCURRENCY=8 CHECK_CONCURRENCY=15 ts-node --project tsconfig.scripts.json scripts/check-internal-links.ts",
+    "check-cta": "ts-node --project tsconfig.scripts.json scripts/check-blank-cta.ts",
+    "check-cta:fast": "CONCURRENCY=10 ts-node --project tsconfig.scripts.json scripts/check-blank-cta.ts",
+    "check-spacing": "ts-node --project tsconfig.scripts.json scripts/check-spacing.ts",
+    "check-spacing:fast": "CONCURRENCY=3 ts-node --project tsconfig.scripts.json scripts/check-spacing.ts",
+    "ux-audit": "ts-node --project tsconfig.scripts.json scripts/ux-spacing-audit.ts",
+    "ux-audit:fast": "CONCURRENCY=5 ts-node --project tsconfig.scripts.json scripts/ux-spacing-audit.ts",
+    "pw-audit": "ts-node --project tsconfig.scripts.json scripts/pw-full-audit.ts",
+    "pw-audit:fast": "CONCURRENCY=8 ts-node --project tsconfig.scripts.json scripts/pw-full-audit.ts"
   },
   "keywords": [
     "playwright",
@@ -35,11 +47,13 @@
     "typescript": "^5.3.0"
   },
   "dependencies": {
+    "exceljs": "^4.4.0",
     "fast-xml-parser": "^5.8.0",
     "papaparse": "^5.4.1",
     "pixelmatch": "^5.3.0",
     "pngjs": "^7.0.0",
-    "sharp": "^0.33.4"
+    "sharp": "^0.33.4",
+    "ts-node": "^10.9.2"
   },
   "engines": {
     "node": ">=18.0.0"

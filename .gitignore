@@ -17,6 +17,10 @@ allure-results/
 allure-report/
 .allure/
 
+# Generated dated QA reports (large HTML/Excel outputs — run locally)
+reports/20*/
+reports/reviewed*/
+
 # Local QA runtime and visual artifacts
 .qa-runtime/
 screenshots/
